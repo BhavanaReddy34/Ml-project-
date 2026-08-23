@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>
+        Traffic Prediction Dashboard
+    </title>
+
+
+    <style>
+
+        /* =====================================================
+           PAGE
+           ===================================================== */
+
+        body {
+
+            font-family: Arial, sans-serif;
+
+            margin: 0;
+
+            background: #f4f6f8;
+
+            color: #222;
+
+        }
+
+
+        /* =====================================================
+           HEADER
+           ===================================================== */
+
+        header {
+
+            background: #17365d;
+
+            color: white;
+
+            padding: 18px 25px;
+
+        }
+
+
+        header h1 {
+
+            margin: 0;
+
+            font-size: 26px;
+
+        }
+
+
+        /* =====================================================
+           MAIN CONTAINER
+           ===================================================== */
+
+        .container {
+
+            padding: 20px;
+
+        }
+
+
+        /* =====================================================
+           CONTROL PANEL
+           ===================================================== */
+
+        .control-panel {
+
+            background: white;
+
+            padding: 18px;
+
+            border-radius: 8px;
+
+            box-shadow:
+                0 2px 6px rgba(0,0,0,0.12);
+
+        }
+
+
+        select {
+
+            padding: 8px;
+
+            min-width: 180px;
+
+            font-size: 15px;
+
+        }
+
+
+        button {
+
+            padding: 8px 20px;
+
+            margin-left: 8px;
+
+            font-size: 15px;
+
+            cursor: pointer;
+
+        }
+
+
+        button:disabled {
+
+            cursor: not-allowed;
+
+            opacity: 0.6;
+
+        }
+
+
+        /* =====================================================
+           STATUS
+           ===================================================== */
+
+        .status {
+
+            margin-top: 15px;
+
+            font-weight: bold;
+
+            color: #17365d;
+
+        }
+
+
+        /* =====================================================
+           CONSOLE
+           ===================================================== */
+
+        #console {
+
+            background: #111;
+
+            color: #00ff55;
+
+            padding: 15px;
+
+            height: 220px;
+
+            overflow-y: auto;
+
+            white-space: pre-wrap;
+
+            font-family: Consolas, monospace;
+
+            border-radius: 6px;
+
+            margin-top: 15px;
+
+        }
+
+
+        /* =====================================================
+           GENERAL SECTION
+           ===================================================== */
+
+        .section {
+
+            background: white;
+
+            margin-top: 20px;
+
+            padding: 18px;
+
+            border-radius: 8px;
+
+            box-shadow:
+                0 2px 6px rgba(0,0,0,0.12);
+
+        }
+
+
+        .section h2 {
+
+            margin-top: 0;
+
+            color: #17365d;
+
+        }
+
+
+        /* =====================================================
+           METRICS
+           ===================================================== */
+
+        #metrics {
+
+            display: none;
+
+            margin-top: 15px;
+
+        }
+
+
+        .metric {
+
+            display: inline-block;
+
+            background: #eef3f8;
+
+            padding: 12px 25px;
+
+            margin-right: 12px;
+
+            border-radius: 6px;
+
+        }
+
+
+        .metric-value {
+
+            font-size: 22px;
+
+            font-weight: bold;
+
+        }
+
+
+        /* =====================================================
+           PREDICTION PLOT
+           ===================================================== */
+
+        #plot {
+
+            max-width: 100%;
+
+            border: 1px solid #ccc;
+
+            display: block;
+
+        }
+
+
+        /* =====================================================
+           HEATMAP
+           ===================================================== */
+
+        #heatmap {
+
+            width: 100%;
+
+            height: 650px;
+
+            border: 1px solid #ccc;
+
+            display: block;
+
+        }
+
+
+        /* =====================================================
+           PIPELINE SECTION
+           ===================================================== */
+
+        #pipeline_section {
+
+            display: block;
+
+        }
+
+
+        #plot_section,
+        #heatmap_section {
+
+            display: none;
+
+        }
+
+
+        /* =====================================================
+           RESULT ACTIONS
+           ===================================================== */
+
+        #result_actions {
+
+            display: none;
+
+            margin-top: 15px;
+
+        }
+
+
+        #refreshButton {
+
+            margin-left: 0;
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <h1>
+        Traffic Prediction Dashboard
+    </h1>
+
+</header>
+
+
+<div class="container">
+
+
+    <!-- ================================================== -->
+    <!-- CONTROL PANEL -->
+    <!-- ================================================== -->
+
+    <div class="control-panel">
+
+        <label for="dataset">
+
+            <b>Dataset:</b>
+
+        </label>
+
+
+        <select id="dataset">
+
+            <option value="bay">
+                PEMS-BAY
+            </option>
+
+            <option value="d7">
+                Caltrans D7
+            </option>
+
+            <option value="seattle">
+                Seattle Loop
+            </option>
+
+        </select>
+
+
+        <button
+            id="runButton"
+            onclick="runPipeline()"
+        >
+            Run
+        </button>
+
+
+        <div
+            id="status"
+            class="status"
+        >
+            Ready
+        </div>
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- PIPELINE LOG -->
+    <!-- ================================================== -->
+
+    <div
+        class="section"
+        id="pipeline_section"
+    >
+
+        <h2>
+            Pipeline Progress
+        </h2>
+
+
+        <pre id="console"></pre>
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- METRICS -->
+    <!-- ================================================== -->
+
+    <div
+        class="section"
+        id="metrics"
+    >
+
+        <h2>
+            Model Performance
+        </h2>
+
+
+        <div class="metric">
+
+            <div>
+                MAE
+            </div>
+
+
+            <div
+                id="mae"
+                class="metric-value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="metric">
+
+            <div>
+                RMSE
+            </div>
+
+
+            <div
+                id="rmse"
+                class="metric-value"
+            >
+                -
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- RESULT ACTIONS -->
+    <!-- ================================================== -->
+
+    <div
+        id="result_actions"
+    >
+
+        <button
+            id="refreshButton"
+            onclick="loadResults()"
+        >
+            Refresh Results
+        </button>
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- PREDICTION -->
+    <!-- ================================================== -->
+
+    <div
+        class="section"
+        id="plot_section"
+    >
+
+        <h2>
+            Actual vs Predicted Traffic Speed
+        </h2>
+
+
+        <img
+            id="plot"
+            alt="Prediction plot"
+        >
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- HEATMAP -->
+    <!-- ================================================== -->
+
+    <div
+        class="section"
+        id="heatmap_section"
+    >
+
+        <h2>
+            Traffic Congestion Hotspots
+        </h2>
+
+
+        <iframe
+            id="heatmap"
+            title="Traffic congestion heatmap"
+        ></iframe>
+
+    </div>
+
+
+</div>
+
+
+<script>
+
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+
+let currentDataset = null;
+
+
+// ============================================================
+// SMALL DELAY HELPER
+// ============================================================
+
+function sleep(milliseconds) {
+
+    return new Promise(
+        resolve => setTimeout(
+            resolve,
+            milliseconds
+        )
+    );
+
+}
+
+
+// ============================================================
+// APPEND TO CONSOLE
+// ============================================================
+
+function appendConsole(text) {
+
+    const consoleBox =
+        document.getElementById(
+            "console"
+        );
+
+
+    consoleBox.textContent += text;
+
+
+    consoleBox.scrollTop =
+        consoleBox.scrollHeight;
+
+}
+
+
+// ============================================================
+// RESET RESULT DISPLAY
+// ============================================================
+
+function resetResults() {
+
+    document.getElementById(
+        "plot_section"
+    ).style.display =
+        "none";
+
+
+    document.getElementById(
+        "heatmap_section"
+    ).style.display =
+        "none";
+
+
+    document.getElementById(
+        "metrics"
+    ).style.display =
+        "none";
+
+
+    document.getElementById(
+        "result_actions"
+    ).style.display =
+        "none";
+
+
+    document.getElementById(
+        "plot"
+    ).removeAttribute(
+        "src"
+    );
+
+
+    document.getElementById(
+        "heatmap"
+    ).removeAttribute(
+        "src"
+    );
+
+
+    document.getElementById(
+        "mae"
+    ).textContent =
+        "-";
+
+
+    document.getElementById(
+        "rmse"
+    ).textContent =
+        "-";
+
+}
+
+
+// ============================================================
+// RUN PIPELINE
+// ============================================================
+
+async function runPipeline() {
+
+
+    const dataset =
+        document.getElementById(
+            "dataset"
+        ).value;
+
+
+    currentDataset =
+        dataset;
+
+
+    const runButton =
+        document.getElementById(
+            "runButton"
+        );
+
+
+    const consoleBox =
+        document.getElementById(
+            "console"
+        );
+
+
+    const status =
+        document.getElementById(
+            "status"
+        );
+
+
+    // --------------------------------------------------------
+    // Reset UI
+    // --------------------------------------------------------
+
+    consoleBox.textContent = "";
+
+
+    resetResults();
+
+
+    runButton.disabled =
+        true;
+
+
+    status.textContent =
+        "Pipeline starting...";
+
+
+    // --------------------------------------------------------
+    // Immediate visible message
+    // --------------------------------------------------------
+
+    appendConsole(
+        "[START] Starting pipeline for " +
+        dataset.toUpperCase() +
+        "\n"
+    );
+
+
+    try {
+
+
+        // ====================================================
+        // START STREAMING REQUEST
+        // ====================================================
+
+        status.textContent =
+            "Connecting to pipeline...";
+
+
+        const response =
+            await fetch(
+                `/run_stream/${dataset}?t=${Date.now()}`,
+                {
+                    cache: "no-store"
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Pipeline request failed. HTTP " +
+                response.status
+            );
+
+        }
+
+
+        if (!response.body) {
+
+            throw new Error(
+                "Browser does not support streaming responses."
+            );
+
+        }
+
+
+        const reader =
+            response.body.getReader();
+
+
+        const decoder =
+            new TextDecoder();
+
+
+        // ----------------------------------------------------
+        // IMPORTANT
+        //
+        // Do NOT wait only for reader.read() to return
+        // done=true.
+        //
+        // Flask streaming can remain open even after the
+        // pipeline has successfully completed.
+        //
+        // We therefore explicitly detect [SUCCESS].
+        // ----------------------------------------------------
+
+        let pipelineFinished =
+            false;
+
+
+        let pipelineFailed =
+            false;
+
+
+        while (
+            !pipelineFinished &&
+            !pipelineFailed
+        ) {
+
+
+            const {
+                value,
+                done
+            } =
+                await reader.read();
+
+
+            // ------------------------------------------------
+            // Stream ended unexpectedly.
+            // ------------------------------------------------
+
+            if (done) {
+
+                break;
+
+            }
+
+
+            if (!value) {
+
+                continue;
+
+            }
+
+
+            const text =
+                decoder.decode(
+                    value,
+                    {
+                        stream: true
+                    }
+                );
+
+
+            // ------------------------------------------------
+            // Display streamed text.
+            // ------------------------------------------------
+
+            appendConsole(
+                text
+            );
+
+
+            // =================================================
+            // STATUS UPDATES
+            // =================================================
+
+            if (
+                text.includes(
+                    "[STEP 1/4]"
+                )
+            ) {
+
+                status.textContent =
+                    "Data conversion in progress...";
+
+            }
+
+
+            if (
+                text.includes(
+                    "[STEP 2/4]"
+                )
+            ) {
+
+                status.textContent =
+                    "Extracting data subset...";
+
+            }
+
+
+            if (
+                text.includes(
+                    "[STEP 3/4]"
+                )
+            ) {
+
+                status.textContent =
+                    "GAT + LSTM model training...";
+
+            }
+
+
+            if (
+                text.includes(
+                    "[STEP 4/4]"
+                )
+            ) {
+
+                status.textContent =
+                    "Testing model predictions...";
+
+            }
+
+
+            if (
+                text.includes(
+                    "Creating Actual vs Predicted"
+                )
+            ) {
+
+                status.textContent =
+                    "Creating prediction plot...";
+
+            }
+
+
+            if (
+                text.includes(
+                    "Computing congestion hotspots"
+                )
+            ) {
+
+                status.textContent =
+                    "Generating congestion heatmap...";
+
+            }
+
+
+            // =================================================
+            // SUCCESS DETECTION
+            // =================================================
+
+            if (
+                text.includes(
+                    "[SUCCESS]"
+                )
+            ) {
+
+                pipelineFinished =
+                    true;
+
+
+                status.textContent =
+                    "Pipeline completed successfully.";
+
+            }
+
+
+            // =================================================
+            // ERROR DETECTION
+            // =================================================
+
+            if (
+                text.includes(
+                    "[ERROR]"
+                )
+            ) {
+
+                pipelineFailed =
+                    true;
+
+
+                status.textContent =
+                    "Pipeline failed.";
+
+            }
+
+        }
+
+
+        // ====================================================
+        // HANDLE PIPELINE ERROR
+        // ====================================================
+
+        if (pipelineFailed) {
+
+            throw new Error(
+                "Pipeline reported an error. "
+                + "See Pipeline Progress above."
+            );
+
+        }
+
+
+        // ====================================================
+        // IMPORTANT:
+        //
+        // Cancel the reader after SUCCESS.
+        //
+        // We do not need to wait for Flask's streaming
+        // connection to close naturally.
+        // ====================================================
+
+        if (pipelineFinished) {
+
+            try {
+
+                await reader.cancel();
+
+            }
+
+            catch (cancelError) {
+
+                console.warn(
+                    "Stream cancellation warning:",
+                    cancelError
+                );
+
+            }
+
+        }
+
+
+        // ----------------------------------------------------
+        // If stream ended without SUCCESS, still attempt to
+        // retrieve results because the backend may have
+        // completed successfully but the final stream packet
+        // may have been lost.
+        // ----------------------------------------------------
+
+        status.textContent =
+            "Loading results...";
+
+
+        // ----------------------------------------------------
+        // Give filesystem a short moment to settle.
+        // ----------------------------------------------------
+
+        await sleep(
+            300
+        );
+
+
+        // ====================================================
+        // LOAD RESULTS
+        // ====================================================
+
+        await loadResults();
+
+
+    }
+
+    catch (error) {
+
+
+        appendConsole(
+            "\n[ERROR] " +
+            error.message +
+            "\n"
+        );
+
+
+        status.textContent =
+            "Pipeline failed.";
+
+
+        console.error(
+            "runPipeline error:",
+            error
+        );
+
+    }
+
+    finally {
+
+        runButton.disabled =
+            false;
+
+    }
+
+}
+
+
+// ============================================================
+// LOAD RESULTS
+//
+// This function is deliberately separate from runPipeline().
+// It can also be called by the Refresh Results button.
+// ============================================================
+
+async function loadResults() {
+
+
+    const dataset =
+        currentDataset ||
+        document.getElementById(
+            "dataset"
+        ).value;
+
+
+    const status =
+        document.getElementById(
+            "status"
+        );
+
+
+    status.textContent =
+        "Loading results...";
+
+
+    console.log(
+        "[DEBUG] Loading results for:",
+        dataset
+    );
+
+
+    try {
+
+
+        // ====================================================
+        // RESULTS REQUEST WITH TIMEOUT
+        // ====================================================
+
+        const controller =
+            new AbortController();
+
+
+        const timeoutId =
+            setTimeout(
+                function() {
+
+                    controller.abort();
+
+                },
+                15000
+            );
+
+
+        let resultResponse;
+
+
+        try {
+
+            resultResponse =
+                await fetch(
+                    `/results/${dataset}?t=${Date.now()}`,
+                    {
+                        cache: "no-store",
+                        signal:
+                            controller.signal
+                    }
+                );
+
+        }
+
+        finally {
+
+            clearTimeout(
+                timeoutId
+            );
+
+        }
+
+
+        console.log(
+            "[DEBUG] Results response:",
+            resultResponse.status,
+            resultResponse.statusText
+        );
+
+
+        // ====================================================
+        // HTTP ERROR
+        // ====================================================
+
+        if (!resultResponse.ok) {
+
+
+            let errorText =
+                "";
+
+
+            try {
+
+                errorText =
+                    await resultResponse.text();
+
+            }
+
+            catch (readError) {
+
+                errorText =
+                    "Unable to read server error.";
+
+            }
+
+
+            throw new Error(
+                "Results request failed. HTTP " +
+                resultResponse.status +
+                ". " +
+                errorText
+            );
+
+        }
+
+
+        // ====================================================
+        // PARSE JSON
+        // ====================================================
+
+        let result;
+
+
+        try {
+
+            result =
+                await resultResponse.json();
+
+        }
+
+        catch (jsonError) {
+
+            throw new Error(
+                "The /results endpoint did not "
+                + "return valid JSON."
+            );
+
+        }
+
+
+        console.log(
+            "[DEBUG] Results JSON:",
+            result
+        );
+
+
+        // ====================================================
+        // VALIDATE RESULT
+        // ====================================================
+
+        if (!result) {
+
+            throw new Error(
+                "Empty results response."
+            );
+
+        }
+
+
+        if (
+            result.error
+        ) {
+
+            throw new Error(
+                result.error
+            );
+
+        }
+
+
+        if (
+            !result.plot
+        ) {
+
+            throw new Error(
+                "Results JSON does not contain a plot URL."
+            );
+
+        }
+
+
+        if (
+            !result.heatmap
+        ) {
+
+            throw new Error(
+                "Results JSON does not contain a heatmap URL."
+            );
+
+        }
+
+
+        // ====================================================
+        // PREDICTION PLOT
+        // ====================================================
+
+        const plotElement =
+            document.getElementById(
+                "plot"
+            );
+
+
+        const plotUrl =
+            result.plot +
+            (
+                result.plot.includes("?")
+                    ? "&"
+                    : "?"
+            ) +
+            "cache=" +
+            Date.now();
+
+
+        console.log(
+            "[DEBUG] Plot URL:",
+            plotUrl
+        );
+
+
+        plotElement.onload =
+            function() {
+
+                console.log(
+                    "[DEBUG] Prediction plot loaded."
+                );
+
+            };
+
+
+        plotElement.onerror =
+            function() {
+
+                console.error(
+                    "[ERROR] Prediction plot failed to load:",
+                    plotUrl
+                );
+
+                appendConsole(
+                    "[WARN] Prediction plot could not be loaded.\n"
+                );
+
+            };
+
+
+        plotElement.src =
+            plotUrl;
+
+
+        document.getElementById(
+            "plot_section"
+        ).style.display =
+            "block";
+
+
+        // ====================================================
+        // HEATMAP
+        // ====================================================
+
+        const heatmapElement =
+            document.getElementById(
+                "heatmap"
+            );
+
+
+        const heatmapUrl =
+            result.heatmap +
+            (
+                result.heatmap.includes("?")
+                    ? "&"
+                    : "?"
+            ) +
+            "cache=" +
+            Date.now();
+
+
+        console.log(
+            "[DEBUG] Heatmap URL:",
+            heatmapUrl
+        );
+
+
+        heatmapElement.onload =
+            function() {
+
+                console.log(
+                    "[DEBUG] Heatmap iframe loaded."
+                );
+
+            };
+
+
+        heatmapElement.onerror =
+            function() {
+
+                console.error(
+                    "[ERROR] Heatmap iframe failed to load:",
+                    heatmapUrl
+                );
+
+                appendConsole(
+                    "[WARN] Heatmap viewer could not be loaded.\n"
+                );
+
+            };
+
+
+        heatmapElement.src =
+            heatmapUrl;
+
+
+        document.getElementById(
+            "heatmap_section"
+        ).style.display =
+            "block";
+
+
+        // ====================================================
+        // METRICS
+        //
+        // Read metrics from the streamed console.
+        // ====================================================
+
+        updateMetrics();
+
+
+        // ====================================================
+        // RESULT ACTIONS
+        // ====================================================
+
+        document.getElementById(
+            "result_actions"
+        ).style.display =
+            "block";
+
+
+        // ====================================================
+        // FINAL STATUS
+        // ====================================================
+
+        status.textContent =
+            "Completed";
+
+
+        appendConsole(
+            "[INFO] Results loaded successfully.\n"
+        );
+
+
+        console.log(
+            "[DEBUG] Results loading completed."
+        );
+
+
+        return result;
+
+    }
+
+
+    catch (error) {
+
+
+        // ----------------------------------------------------
+        // AbortController timeout
+        // ----------------------------------------------------
+
+        if (
+            error.name ===
+            "AbortError"
+        ) {
+
+            appendConsole(
+                "[ERROR] Results request timed out after 15 seconds.\n"
+            );
+
+
+            status.textContent =
+                "Unable to load results.";
+
+
+            console.error(
+                "Results request timed out."
+            );
+
+
+            return null;
+
+        }
+
+
+        // ----------------------------------------------------
+        // Other error
+        // ----------------------------------------------------
+
+        appendConsole(
+            "[ERROR] " +
+            error.message +
+            "\n"
+        );
+
+
+        status.textContent =
+            "Unable to load results.";
+
+
+        console.error(
+            "loadResults error:",
+            error
+        );
+
+
+        return null;
+
+    }
+
+}
+
+
+// ============================================================
+// UPDATE METRICS
+// ============================================================
+
+function updateMetrics() {
+
+
+    const consoleBox =
+        document.getElementById(
+            "console"
+        );
+
+
+    const lines =
+        consoleBox.textContent
+            .split("\n");
+
+
+    let maeValue =
+        null;
+
+
+    let rmseValue =
+        null;
+
+
+    for (
+        const line of lines
+    ) {
+
+
+        // ----------------------------------------------------
+        // MAE
+        // ----------------------------------------------------
+
+        if (
+            line.includes(
+                "MAE"
+            )
+        ) {
+
+
+            const match =
+                line.match(
+                    /MAE\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)/
+                );
+
+
+            if (match) {
+
+                maeValue =
+                    match[1];
+
+            }
+
+        }
+
+
+        // ----------------------------------------------------
+        // RMSE
+        // ----------------------------------------------------
+
+        if (
+            line.includes(
+                "RMSE"
+            )
+        ) {
+
+
+            const match =
+                line.match(
+                    /RMSE\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)/
+                );
+
+
+            if (match) {
+
+                rmseValue =
+                    match[1];
+
+            }
+
+        }
+
+    }
+
+
+    // ========================================================
+    // DISPLAY METRICS
+    // ========================================================
+
+    if (
+        maeValue !== null ||
+        rmseValue !== null
+    ) {
+
+
+        document.getElementById(
+            "mae"
+        ).textContent =
+            maeValue ||
+            "-";
+
+
+        document.getElementById(
+            "rmse"
+        ).textContent =
+            rmseValue ||
+            "-";
+
+
+        document.getElementById(
+            "metrics"
+        ).style.display =
+            "block";
+
+    }
+
+}
+
+
+// ============================================================
+// DATASET CHANGE
+// ============================================================
+
+document.getElementById(
+    "dataset"
+).addEventListener(
+    "change",
+    function() {
+
+        currentDataset =
+            this.value;
+
+    }
+);
+
+
+// ============================================================
+// INITIAL STATE
+// ============================================================
+
+currentDataset =
+    document.getElementById(
+        "dataset"
+    ).value;
+
+
+</script>
+
+
+</body>
+
+</html>
