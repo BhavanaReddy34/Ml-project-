@@ -10,6 +10,19 @@ import os
 import time
 import traceback
 import json
+# ============================================================
+# LOGGING SETUP
+# ============================================================
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+STATIC_DIR = "static"
 
 from pipeline import (
     convert_data,
@@ -39,6 +52,9 @@ def index():
 
 @app.route("/run_stream/<dataset>")
 def run_stream(dataset):
+    """
+    Streams pipeline execution logs to frontend in real-time.
+    """
 
     dataset = dataset.lower()
 
@@ -74,6 +90,7 @@ def run_stream(dataset):
                     message,
                     flush=True
                 )
+                logger.info(message)
 
             # ------------------------------------------------
             # STEP 1
@@ -174,19 +191,18 @@ def run_stream(dataset):
                 "pipeline finished successfully.\n"
             )
 
+
         except Exception as e:
+
+            import traceback
 
             traceback.print_exc()
 
-            print(
-                "[ERROR]",
-                repr(e),
-                flush=True
-            )
+            logger.exception("Pipeline error")
 
-            yield (
-                f"[ERROR] {str(e)}\n"
-            )
+            print("[ERROR]", repr(e), flush=True)
+
+            yield f"[ERROR] {str(e)}\n"
 
     response = Response(
         generate(),
@@ -218,12 +234,12 @@ def results(dataset):
     dataset = dataset.lower()
 
     plot_file = os.path.join(
-        "static",
+        STATIC_DIR,
         f"{dataset}_plot.png"
     )
 
     heatmap_file = os.path.join(
-        "static",
+        STATIC_DIR,
         f"heatmap_{dataset}.json"
     )
 
@@ -289,7 +305,7 @@ def build_heatmap(dataset):
         ), 400
 
     heatmap_path = os.path.join(
-        "static",
+        STATIC_DIR,
         f"heatmap_{dataset}.json"
     )
 
@@ -1495,7 +1511,14 @@ updateMap();
         heatmap_data
     )
 
-    return html
+    try:
+        return render_template(
+            "heatmap.html",
+            dataset=dataset
+        )
+    except Exception:
+        # fallback to existing inline HTML (SAFE)
+        return html
 
 
 # ============================================================

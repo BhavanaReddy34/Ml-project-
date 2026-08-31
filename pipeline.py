@@ -13,31 +13,48 @@ import urllib.request
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-from utils import create_seq, normalize, denormalize
-from model import GAT_LSTM
-
+import logging
+import random
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
-OUT = "processed"
-STATIC = "static"
 
-SEQ_LEN = 24
+CONFIG = {
+    "OUT": "processed",
+    "STATIC": "static",
+    "SEQ_LEN": 24,
+    "SUBSET_ROWS": 2000,
+    "SUBSET_NODES": 30,
+    "TEST_POINTS": 50,
+    "EPOCHS": 5,
+    "BATCH_SIZE": 64,
+    "LR": 0.0005
+}
 
-# Keep the existing 2000-row training subset.
-SUBSET_ROWS = 2000
+OUT = CONFIG["OUT"]
+STATIC = CONFIG["STATIC"]
+SEQ_LEN = CONFIG["SEQ_LEN"]
+SUBSET_ROWS = CONFIG["SUBSET_ROWS"]
+SUBSET_NODES = CONFIG["SUBSET_NODES"]
+TEST_POINTS = CONFIG["TEST_POINTS"]
+EPOCHS = CONFIG["EPOCHS"]
+BATCH_SIZE = CONFIG["BATCH_SIZE"]
+LEARNING_RATE = CONFIG["LR"]
 
-# GAT_LSTM in the current project is configured for 30 nodes.
-SUBSET_NODES = 30
+# ============================================================
+# LOGGING CONFIG
+# ============================================================
 
-TEST_POINTS = 50
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s"
+)
 
-EPOCHS = 5
-BATCH_SIZE = 64
-LEARNING_RATE = 0.0005
+logger = logging.getLogger(__name__)
 
+from utils import create_seq, normalize, denormalize
+from model import GAT_LSTM
 
 # ============================================================
 # D7 CONFIGURATION
@@ -119,14 +136,19 @@ SEATTLE_MAX_SENSORS_PER_ROADWAY = 8
 # LOGGING
 # ============================================================
 def emit(log_fn, message):
-    print(message, flush=True)
+    """
+    Unified logging:
+    - Uses logging module
+    - Still supports Flask streaming
+    """
+
+    logger.info(message)
 
     if log_fn is not None:
         try:
             log_fn(message)
         except Exception:
             pass
-
 
 # ============================================================
 # PATHS
@@ -2892,6 +2914,23 @@ def subset_data(dataset, log_fn=print):
 # ============================================================
 def train_model(dataset, log_fn=print):
     dataset = dataset.lower()
+    # ============================================================
+    # REPRODUCIBILITY
+    # ============================================================
+
+    SEED = 42
+
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    emit(log_fn, f"[INFO] Seed set to {SEED}")
 
     ensure_dir(dataset)
 
