@@ -19,21 +19,22 @@ import random
 # ============================================================
 # CONFIGURATION
 # ============================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+OUT = os.path.join(BASE_DIR, "processed")
+STATIC = os.path.join(BASE_DIR, "static")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
 CONFIG = {
-    "OUT": "processed",
-    "STATIC": "static",
     "SEQ_LEN": 24,
     "SUBSET_ROWS": 2000,
     "SUBSET_NODES": 30,
     "TEST_POINTS": 50,
-    "EPOCHS": 5,
+    "EPOCHS": 25,
     "BATCH_SIZE": 64,
     "LR": 0.0005
 }
 
-OUT = CONFIG["OUT"]
-STATIC = CONFIG["STATIC"]
 SEQ_LEN = CONFIG["SEQ_LEN"]
 SUBSET_ROWS = CONFIG["SUBSET_ROWS"]
 SUBSET_NODES = CONFIG["SUBSET_NODES"]
@@ -158,15 +159,15 @@ def get_paths(dataset):
 
     paths = {
         "bay": os.path.join(
-            "data", "bay", "pems-bay.h5"
+            DATA_DIR, "bay", "pems-bay.h5"
         ),
 
         "d7": os.path.join(
-            "data", "d7", "traffic_d7.csv"
+            DATA_DIR, "d7", "traffic_d7.csv"
         ),
 
         "seattle": os.path.join(
-            "data", "seattle", "speed_matrix_2015"
+            DATA_DIR, "seattle", "speed_matrix_2015"
         )
     }
 
@@ -2912,6 +2913,20 @@ def subset_data(dataset, log_fn=print):
 # ============================================================
 # TRAIN MODEL
 # ============================================================
+
+"""
+Trains GAT + LSTM model.
+
+Includes:
+- Normalization
+- Sequence creation
+- Early stopping (patience-based)
+- Model checkpointing
+
+Returns:
+    model_path (str)
+"""
+
 def train_model(dataset, log_fn=print):
     dataset = dataset.lower()
     # ============================================================
@@ -2964,6 +2979,25 @@ def train_model(dataset, log_fn=print):
             f"{data.shape[1]}."
         )
 
+    # ============================================================
+    # TRAIN / VAL / TEST SPLIT (TIME-SERIES SAFE)
+    # ============================================================
+
+    emit(log_fn, "[STEP] Creating train/val/test split...")
+
+    total_len = data.shape[0]
+
+    train_end = int(total_len * 0.7)
+    val_end = int(total_len * 0.85)
+
+    train_data = data[:train_end]
+    val_data = data[train_end:val_end]
+    test_data = data[val_end:]
+
+    emit(log_fn, f"[INFO] Train shape: {train_data.shape}")
+    emit(log_fn, f"[INFO] Val shape:   {val_data.shape}")
+    emit(log_fn, f"[INFO] Test shape:  {test_data.shape}")
+
     # --------------------------------------------------------
     # NORMALIZATION
     # --------------------------------------------------------
@@ -2972,9 +3006,10 @@ def train_model(dataset, log_fn=print):
         "[STEP] Normalizing training data..."
     )
 
-    data_norm, mean, std = normalize(
-        data
-    )
+    train_norm, mean, std = normalize(train_data)
+
+    val_norm = (val_data - mean) / std
+    test_norm = (test_data - mean) / std
 
     mean = np.asarray(
         mean,
@@ -3010,6 +3045,8 @@ def train_model(dataset, log_fn=print):
         std
     )
 
+    np.save(os.path.join(OUT, dataset, "test.npy"), test_data)
+
     emit(
         log_fn,
         f"[INFO] Saved mean: {OUT}/{dataset}/mean.npy"
@@ -3020,11 +3057,16 @@ def train_model(dataset, log_fn=print):
         f"[INFO] Saved std: {OUT}/{dataset}/std.npy"
     )
 
+    emit(
+        log_fn,
+        f"[INFO] Saved test data: {OUT}/{dataset}/test.npy"
+    )
+
     # --------------------------------------------------------
     # SEQUENCES
     # --------------------------------------------------------
     X, Y = create_seq(
-        data_norm,
+        train_norm,
         seq_len=SEQ_LEN
     )
 
@@ -3076,6 +3118,15 @@ def train_model(dataset, log_fn=print):
     # --------------------------------------------------------
     model.train()
 
+    best_loss = float("inf")
+    patience = 3
+    patience_counter = 0
+    model_path = os.path.join(
+        OUT,
+        dataset,
+        "model.pth"
+    )
+
     for epoch in range(EPOCHS):
         permutation = torch.randperm(
             X.size(0)
@@ -3124,14 +3175,27 @@ def train_model(dataset, log_fn=print):
             f"- Loss: {average_loss:.6f}"
         )
 
+        # =====================================================
+        # EARLY STOPPING LOGIC
+        # =====================================================
+
+        if average_loss < best_loss:
+            best_loss = average_loss
+            patience_counter = 0
+
+            # Save best model
+            torch.save(model.state_dict(), model_path)
+
+        else:
+            patience_counter += 1
+
+            if patience_counter >= patience:
+                emit(log_fn, "[INFO] Early stopping triggered")
+                break
+
     # --------------------------------------------------------
     # SAVE MODEL
     # --------------------------------------------------------
-    model_path = os.path.join(
-        OUT,
-        dataset,
-        "model.pth"
-    )
 
     torch.save(
         model.state_dict(),
@@ -3954,8 +4018,13 @@ def test_model(dataset, log_fn=print):
         "[INFO] Loading test data..."
     )
 
+    test_path = os.path.join(OUT, dataset, "test.npy")
+
+    if not os.path.exists(test_path):
+        raise FileNotFoundError("test.npy missing. Train step must run first.")
+
     data = np.load(
-        subset_path
+        test_path
     ).astype(
         np.float32
     )

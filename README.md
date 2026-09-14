@@ -1,25 +1,34 @@
-🚦 Traffic Congestion Prediction using GAT + LSTM
+# 🚦 Traffic Congestion Prediction using GAT + LSTM
+
 This project predicts urban traffic congestion using a hybrid deep learning model combining:
-Graph Attention Networks (GAT) → spatial relationships between sensors
-LSTM (Long Short-Term Memory) → temporal traffic patterns
-It includes a Flask dashboard for visualization.
+
+- **Graph Attention Networks (GAT)** → spatial relationships between sensors  
+- **LSTM (Long Short-Term Memory)** → temporal traffic patterns  
+
+It includes a **Flask dashboard** for visualization.
+
 ---
-📊 Features
-Multi-dataset support:
-PEMS-BAY
-Caltrans D7
-Seattle Loop
-End-to-end pipeline:
-Data loading
-Preprocessing
-Model training
-Prediction
-Visualization:
-Actual vs Predicted plots
-Traffic congestion heatmap (Leaflet)
+
+# 📊 Features
+
+- Multi-dataset support:
+  - PEMS-BAY
+  - Caltrans D7
+  - Seattle Loop
+- End-to-end pipeline:
+  - Data loading
+  - Preprocessing
+  - Model training
+  - Prediction
+- Visualization:
+  - Actual vs Predicted plots
+  - Traffic congestion heatmap (Leaflet)
+
 ---
-🧠 Model Architecture
-GAT + LSTM Pipeline
+
+# 🧠 Model Architecture
+
+### GAT + LSTM Pipeline
 Input (Traffic Speeds)
 ↓
 GAT Layer (Spatial Learning)
@@ -32,29 +41,37 @@ Dense Layer
 ↓
 Predicted Traffic Speed
 
+
 ---
-📁 Project Structure
-MLProject/
-│
-├── app.py # Flask app
-├── pipeline.py # Core pipeline logic
-├── model.py # GAT + LSTM model
-├── utils.py # Data utilities
-│
+
+# 📁 Project Structure
+
+Project Structure
+
+├── app.py
+├── pipeline.py
+├── model.py
+├── utils.py
+├── evaluate.py
 ├── data/
-│ ├── bay/
-│ ├── d7/
-│ └── seattle/
-│
-├── processed/ # Generated data
-├── static/ # Plots + heatmap JSON
+│   ├── bay/
+│   ├── d7/
+│   └── seattle/
+├── processed/
+├── static/
 ├── templates/
-│ └── index.html
-│
-└── requirements.txt
+│   └── index.html
+├── tests/
+│   └── test_utils.py
+├── requirements.txt
+└── README.md
+
 ---
-⚙️ Installation
-1. Clone repository
+
+# ⚙️ Installation
+
+## 1. Clone repository
+
 ```bash
 git clone <your-repo-url>
 cd MLProject
